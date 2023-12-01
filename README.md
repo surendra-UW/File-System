@@ -174,7 +174,7 @@ static struct fuse_operations ops = {
 };
 ```
 
-See [https://www.cs.hmc.edu/~geoff/classes/hmc.cs135.201001/homework/fuse/fuse_doc.html]() to learn more about each registered function. 
+See [CS135 FUSE Documentation](https://www.cs.hmc.edu/~geoff/classes/hmc.cs135.201001/homework/fuse/fuse_doc.html) to learn more about each registered function. 
 
 To simplify the project, your log-structured system doesn't wrap, which means it does not overwrite old data even when the disk is full. The filesystem is only compacted if `fsck.wfs` is executed. 
 
