@@ -1,7 +1,13 @@
 # Administrivia
 
 [- NEW INSTRUCTIONS: -]
-A `prebuilt_disk` has been added which contains a working log file system with several files and subdirectories. You should be able to mount and read the files and directories from it.
+
+- Updates to inode structures happen in place. Other modifications (write to a file, adding/removing an entry under a folder) append log entries. 
+
+- `st_atime` field is no longer needed to fill for `getattr`. 
+
+- A `prebuilt_disk` has been added which contains a working log file system with several files and subdirectories. You should be able to mount and read the files and directories from it.
+
 [- END NEW INSTRUCTIONS -]
 
 - **Due date**: December 8th, 2023 at 11:59pm.
@@ -149,7 +155,6 @@ Your filesystem needs to implement the following features:
   Fill the following fields of struct stat
   - st_uid
   - st_gid
-  - st_atime
   - st_mtime
   - st_mode
   - st_nlink
@@ -177,7 +182,7 @@ To simplify the project, your log-structured system doesn't wrap, which means it
 
 In `wfs.h`, we provide the structures used in this filesystem. 
 
-`wfs_log_entry` holds a log entry. `inode` contains necessary meta data for this entry. 
+`wfs_log_entry` holds a log entry. `inode` contains necessary meta data for this entry. The modification of `inode` happens in place instead of appending a new log entry. 
 
 If a log entry represents a directory, `data` (a [flexible array member](https://gcc.gnu.org/onlinedocs/gcc/extensions-to-the-c-language-family/arrays-of-length-zero.html)) includes an array of `wfs_dentry`. Each `wfs_dentry` represents a file/directory within this folder. If the log entry is for a file, `data` contains the content of this file. 
 
