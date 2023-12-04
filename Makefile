@@ -1,4 +1,4 @@
-NAME = mount.wfs mkfs.wfs fsck.wfs
+NAME = mount.wfs mkfs.wfs #fsck.wfs
 
 CC = gcc
 CFLAGS = -Wall -Werror -pedantic -std=gnu18
@@ -15,9 +15,9 @@ mount.wfs:
 mkfs.wfs:
 	$(CC) $(CFLAGS) -o mkfs.wfs mkfs.wfs.c
 
-.PHONY: fsck.wfs
-fsck.wfs:
-	$(CC) $(CFLAGS) -o fsck.wfs fsck.wfs.c
+# .PHONY: fsck.wfs
+# fsck.wfs:
+# 	$(CC) $(CFLAGS) -o fsck.wfs fsck.wfs.c
 
 .PHONY: clean
 clean:
