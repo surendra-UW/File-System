@@ -35,13 +35,15 @@ int main(int argc, char *argv[])
 
     struct wfs_sb *super_block = (struct wfs_sb *)data;
     super_block->magic = WFS_MAGIC;
-    super_block->head = (uint32_t)(uintptr_t)((char *)data + sizeof(struct wfs_sb));
+    super_block->head = (uint32_t)(sizeof(struct wfs_sb));
 
     struct wfs_log_entry *root_dir = (struct wfs_log_entry *)((char *)data + sizeof(struct wfs_sb));
     root_dir->inode.inode_number = 0;
     root_dir->inode.size = 0;
     root_dir->inode.mode = S_IFDIR;
-    super_block->head = (uint32_t)(uintptr_t)((char *)root_dir + INODE_SIZE);
+    super_block->head += (uint32_t)(sizeof(struct wfs_log_entry));
+
+    printf("%x\n",super_block->head);
 
     // Sync changes to the underlying file
     msync(data, file_size, MS_SYNC);
