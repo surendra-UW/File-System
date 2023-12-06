@@ -106,6 +106,9 @@ int main(int argc, char *argv[])
     char *tail = (char *)disk_ptr + super_block->head ;
     char *start = (char *)disk_ptr+ sizeof(super_block);
     printf("start pointer %p end pointer %p\n", start , tail);
+    printf("Sizeof log entry %u\n",(uint32_t)sizeof(struct wfs_log_entry));
+    printf("Sizeof wfs_inode %u\n",(uint32_t)sizeof(struct wfs_inode));
+    printf("Sizeof wfs_dentry %u\n",(uint32_t)sizeof(struct wfs_dentry));
 
     while (start < tail)
     {
@@ -113,20 +116,21 @@ int main(int argc, char *argv[])
         struct wfs_inode in = log_entry->inode;
 
         inode_maps[in.inode_number] = (char *)start;
-        printf("inode %d inode offset is: %p mode is %u inode size %u\n", in.inode_number, inode_maps[in.inode_number], in.mode, in.size);
-        // if (in.mode == S_IFDIR)
-        // {
+        printf("inode %d mode is %u inode size %u size of data %u\n", in.inode_number, in.mode, in.size, (uint32_t)strlen(log_entry->data));
+        if (in.size %sizeof(struct wfs_dentry) == 0)
+        {
+            printf("directory content is\n");
             int dire = in.size/sizeof(struct wfs_dentry);
             for(int i=0;i<dire ; i++) {
-                struct wfs_dentry *dentry = (struct wfs_dentry *)(start+i*sizeof(struct wfs_dentry));
+                struct wfs_dentry *dentry = (struct wfs_dentry *)(start+INODE_SIZE+i*sizeof(struct wfs_dentry));
                 printf("inode data %s inode numebr %lu parent inode %d\n", dentry->name,
                 dentry->inode_number, in.inode_number);
 
             }
 
-        // } else {  //if (in.mode == S_IFREG) 
-             printf("inode data %s \n", log_entry->data);
-        // }
+        } else {  //if (in.mode == S_IFREG) 
+             printf("file content is %s\n", log_entry->data);
+        }
         start = start + INODE_SIZE + in.size;
     }
     // Initialize FUSE with specified operations
