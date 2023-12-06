@@ -3,7 +3,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "wfs.h"
+#include "fuse.h"
 
 int main(int argc, char *argv[])
 {

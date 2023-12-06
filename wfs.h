@@ -8,6 +8,8 @@
 #define WFS_MAGIC 0xdeadbeef
 #define INODE_SIZE 44
 #define MAX_PATH_LEN 128
+#define MAX_INODES 256
+
 
 struct wfs_sb {
     uint32_t magic;
