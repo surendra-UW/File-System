@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     super_block->head = (uint32_t)(sizeof(struct wfs_sb));
 
     struct wfs_log_entry *root_dir = (struct wfs_log_entry *)((char *)data + sizeof(struct wfs_sb));
+    memset(root_dir,0,sizeof(struct wfs_log_entry));
     root_dir->inode.inode_number = 0;
     root_dir->inode.size = 0;
     root_dir->inode.mode = S_IFDIR;
