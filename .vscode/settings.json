@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "fuse.h": "c"
+        "fs.C": "cpp",
+        "typeinfo": "cpp",
+        "*.tcc": "cpp"
     }
 }
