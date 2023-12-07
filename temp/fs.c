@@ -802,6 +802,7 @@ int main( int argc, char *argv[] ) {
     disk_ptr = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
     build_inode_map();
+	printf("%i\n", find_inode("mnt/dir1/file10"));
 
 	return fuse_main(argc, argv, &operations, NULL);
 }

@@ -14,8 +14,6 @@ int find_inode(const char *path);
 char *inode_maps[MAX_INODES];
 
 void* disk_ptr;
-char root_dir[MAX_PATH_LEN];
-
 
 static int my_getattr(const char *path, struct stat *stbuf) {
     // Implementation of getattr function to retrieve file attributes
@@ -93,13 +91,6 @@ int find_inode(const char *path)
 {
     char * path_name = malloc(strlen(path) + 1);
     strcpy(path_name, path);
-    printf("%s\n",path_name);
-    printf("root dir %s\n",root_dir);
-    // printf("root dir %s and lengthn %d and pathname %s\n", root_dir, (int)strlen(root_dir), path_name);
-    if(strncmp(path_name, root_dir, strlen(root_dir)) != 0) {
-        return -1;
-    } 
-    path_name = path_name+strlen(root_dir);
 
     if(path_name[0] == '/'){
 		path_name++;
@@ -118,7 +109,6 @@ int find_inode(const char *path)
 		if(index != NULL){
 			strncpy(curr_dir, path_name, index - path_name);
 			curr_dir[index-path_name] = '\0';
-             // i=0 mount dir skip it
 		}
         else{
             strcpy(curr_dir, path_name);
@@ -129,7 +119,6 @@ int find_inode(const char *path)
         struct wfs_log_entry *log_entry = (struct wfs_log_entry *) inode_maps[inode];
         struct wfs_inode in = log_entry->inode;
 
-        // log entry is of type dir?
         if (in.mode & S_IFREG)
         return -1;
 
@@ -154,32 +143,32 @@ int find_inode(const char *path)
     return inode; 
 }
 
-// static int my_open(const char *path, struct fuse_file_info *fi){
-//     printf("my open operation %s\n", path);
-//     int inode = find_inode(path);
-//     printf("inode number %d\n", inode);
-//     if(inode<0)
-//     return -1;
-//     return 0;
+static int my_open(const char *path, struct fuse_file_info *fi){
+    printf("my open operation %s\n", path);
+    int inode = find_inode(path);
+    printf("inode number %d\n", inode);
+    if(inode<0)
+    return -1;
+    return 0;
     
-// }
+}
 
 
 
-// static int my_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
-//     printf("my read operation %s\n", path);
-//     int inode = find_inode(path);
-//     printf("inode number %d\n", inode);
-//     if(inode<0)
-//     return 0;
+static int my_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
+    printf("my read operation %s\n", path);
+    int inode = find_inode(path);
+    printf("inode number %d\n", inode);
+    if(inode<0)
+    return 0;
     
-//     memset(buf, 0, size);
-//     memcpy(buf,(char*)(inode_maps[inode]+INODE_SIZE + offset), size);
-//     return strlen(buf);
-// }
+    memset(buf, 0, size);
+    memcpy(buf,(char*)(inode_maps[inode]+INODE_SIZE + offset), size);
+    return strlen(buf);
+}
 
-int myreaddir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi ){
-	printf("READDIR\n");
+int my_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi ){
+    printf("my read dir operation %s\n", path);
     int inode = find_inode(path);
     printf("inode number %d\n", inode);
 
@@ -191,22 +180,19 @@ int myreaddir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offs
 
     
     int n_dir = in.size/sizeof(struct wfs_dentry);
-    printf("%i\n",n_dir);
     for(int j=0;j<n_dir ; j++) {
         struct wfs_dentry *dentry = (struct wfs_dentry *)(inode_maps[inode]+INODE_SIZE+j*sizeof(struct wfs_dentry));
         printf(":%s:\n", dentry->name);
 		filler( buffer, dentry->name, NULL, 0 );
-        printf("%i\n",j);
     }
-    printf("%i\n",n_dir);
 	return 0;
 }
 
 static struct fuse_operations my_operations = {
     .getattr = my_getattr,
-	.readdir=myreaddir,
-    // .open =  my_open,
-    // .read = my_read,
+	.readdir=my_readdir,
+    .open =  my_open,
+    .read = my_read,
     // Add other functions (read, write, mkdir, etc.) here as needed
 };
 
@@ -219,60 +205,27 @@ int main(int argc, char *argv[])
         inode_maps[i] = NULL;
     }
 
-    // if (argc <= 3)
-    // {
-    //     printf("disk path and mount are required\n");
-    //     exit(1);
-    // }
+    if (argc <= 3)
+    {
+        printf("disk path and mount are required\n");
+        exit(1);
+    }
+    
+    char diskpath[MAX_PATH_LEN];
 
-    // char disk_path[MAX_PATH_LEN];
-
-    // strcpy(root_dir, argv[argc - 1]);
-
-    // if (realpath(argv[argc - 2], disk_path) == NULL) {
-    //     perror("error extarcting disk absolute path");
-    //     return -1;
-    // }
-
-    // int fd = open(disk_path, O_RDWR);
-    // if (fd == -1)
-    // {
-    //     perror("open");
-    //     return 1;
-    // }
-
-    // // Get the file size
-    // size_t file_size = lseek(fd, 0, SEEK_END);
-
-    // disk_ptr = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
-    // build_inode_map();
-    // // printf("%i\n", find_inode("mnt/dir1/file10"));
-
-    // // deleting disk path from arguments to be passed to fuse
-    // argv[argc - 2] = argv[argc - 1];
-    // argv[argc - 1] = NULL;
-
-    // // Initialize FUSE with specified operations
-    // // Filter argc and argv here and then pass it to fuse_main
-    // int fuse_stat = fuse_main(argc - 1, argv, &my_operations, NULL);
-    // close(fd);
-    char* diskpath = "/home/hchaudhary/Desktop/File-System/temp/prebuilt_disk";
-    // char diskpath[MAX_PATH_LEN];
-
-    // strcpy(diskpath, argv[argc - 2]);
+    strcpy(diskpath, argv[argc - 2]);
 
     // if (realpath(argv[argc - 2], diskpath) == NULL) {
     //     perror("error extarcting disk absolute path");
     //     return -1;
     // }
+
 	int fd = open(diskpath, O_RDWR);
     if (fd == -1)
     {
         perror("open");
         return 1;
     }
-    
 
     // Get the file size
     size_t file_size = lseek(fd, 0, SEEK_END);
@@ -280,14 +233,10 @@ int main(int argc, char *argv[])
     disk_ptr = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
     build_inode_map();
-    // strcpy(root_dir, argv[argc - 1]);
-    printf("%i\n", find_inode("mnt/dir1/file10"));
 
-    // argv[argc-2] = argv[argc-1];
-    
-    // // sprintf(destination, "%s", source);
-    // argc--;
-    // for(int i=0;i<argc;i++)
-    // printf("Mount dir %s\n",argv[i]);
+    argv[argc-2] = argv[argc-1];
+    argc--;
+   
+
     return fuse_main(argc, argv, &my_operations, NULL);
 }
