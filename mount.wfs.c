@@ -21,9 +21,10 @@ static int my_getattr(const char *path, struct stat *stbuf)
     // Implementation of getattr function to retrieve file attributes
     // Fill stbuf structure with the attributes of the file/directory indicated by path
     // ...
+    printf("my get attribute %s\n", path);
     int inode_number = find_inode(path);
     if (inode_number == -1)
-        return -1;
+        return -ENOENT;
     char *offset = inode_maps[inode_number];
 
     struct wfs_inode *inode = (struct wfs_inode *)offset;
@@ -244,7 +245,7 @@ char *get_filename_and_parent_path(char *path_name) {
 
 int check_file_exists(struct wfs_dentry *dir_entries, int dentry_count, char *file_name) {
     for(int i=0;i<dentry_count;i++) {
-        if(strcmp(dir_entries, file_name) == 0)
+        if(strcmp(dir_entries->name, file_name) == 0)
             return 1;
         dir_entries = dir_entries+1;
     }
@@ -263,7 +264,7 @@ static int my_mkdir(const char *path, mode_t mode)
     //extract parent inode 
     int parent_inode_number = find_inode(path_name);
     if(parent_inode_number == -1) 
-        return ENOENT;
+        return -ENOENT;
     
     int new_inode_number = find_free_inode();
     if(new_inode_number == -1) {
@@ -304,7 +305,7 @@ static int my_mkdir(const char *path, mode_t mode)
 
     //set inode details for new directory
     new_directory_entry_log->inode.inode_number = new_inode_number;
-    new_directory_entry_log->inode.mode = mode;
+    new_directory_entry_log->inode.mode = mode|S_IFDIR;
     new_directory_entry_log->inode.links = 1;
 
     //mark parent old log deleted
@@ -322,7 +323,7 @@ static int my_write(const char* path, const char *buf, size_t size, off_t offset
     printf("writing to a file %s\n", path);
     int inode_number = find_inode(path);
     if(inode_number == -1) {
-        return ENOENT;
+        return -ENOENT;
     }
 
     char *inode_ptr = inode_maps[inode_number];
@@ -362,7 +363,7 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
     //extract parent inode 
     int parent_inode_number = find_inode(path_name);
     if(parent_inode_number == -1) 
-        return ENOENT;
+        return -ENOENT;
     
     //get new inode number 
     int new_inode_number = find_free_inode();
@@ -378,7 +379,7 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
     int dentry_count = parent->inode.size/sizeof(struct wfs_dentry);
 
     //check if the directory already exists 
-    if(check_file_exists(dentry, dentry_count, dir_name) == 1) 
+    if(check_file_exists(dentry, dentry_count, file_name) == 1) 
         return EEXIST;
     
     //create new log entry for parent inode
