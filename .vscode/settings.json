@@ -2,6 +2,8 @@
     "files.associations": {
         "fs.C": "cpp",
         "typeinfo": "cpp",
-        "*.tcc": "cpp"
-    }
+        "*.tcc": "cpp",
+        "errno.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }
