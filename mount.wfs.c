@@ -16,6 +16,8 @@ char *inode_maps[MAX_INODES];
 
 void *disk_ptr;
 
+size_t file_size;
+
 static int my_getattr(const char *path, struct stat *stbuf)
 {
     // Implementation of getattr function to retrieve file attributes
@@ -38,43 +40,6 @@ printf("my get attribute %s\n", path);
 
     return 0; // Return 0 on success
 }
-
-// void build_inode_map()
-// {
-//     struct wfs_sb *super_block = (struct wfs_sb *) disk_ptr;
-//     printf("super block offset %d ", super_block->head);
-
-//     char *tail = (char *)disk_ptr + super_block->head ;
-//     char *start = (char *)disk_ptr+ sizeof(super_block);
-//     printf("start pointer %p end pointer %p\n", start , tail);
-//     printf("Sizeof log entry %u\n",(uint32_t)sizeof(struct wfs_log_entry));
-//     printf("Sizeof wfs_inode %u\n",(uint32_t)sizeof(struct wfs_inode));
-//     printf("Sizeof wfs_dentry %u\n",(uint32_t)sizeof(struct wfs_dentry));
-
-//     while (start < tail)
-//     {
-//         struct wfs_log_entry *log_entry = (struct wfs_log_entry *) start;
-//         struct wfs_inode in = log_entry->inode;
-
-//         inode_maps[in.inode_number] = (char *)start;
-//         printf("inode %d mode is %u inode size %u size of data %u\n", in.inode_number, in.mode, in.size, (uint32_t)strlen(log_entry->data));
-//         if (in.mode & S_IFDIR)
-//         {
-//             printf("directory content is\n");
-//             int dire = in.size/sizeof(struct wfs_dentry);
-//             for(int i=0;i<dire ; i++) {
-//                 struct wfs_dentry *dentry = (struct wfs_dentry *)(start+INODE_SIZE+i*sizeof(struct wfs_dentry));
-//                 printf("inode data %s inode numebr %lu parent inode %d\n", dentry->name,
-//                 dentry->inode_number, in.inode_number);
-
-//             }
-
-//         } else {
-//              printf("file content is %s\n", log_entry->data);
-//         }
-//         start = start + INODE_SIZE + in.size;
-//     }
-// }
 
 void build_inode_map()
 {
@@ -282,8 +247,17 @@ static int my_mkdir(const char *path, mode_t mode)
     if(check_file_exists(dentry, dentry_count, dir_name) == 1) 
         return -EEXIST;
     
-    //create new log entry for parent inode
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+
+    //check if space is available for log insertion 
+    size_t space_required_for_new_log = sizeof(struct wfs_dentry) + parent->inode.size 
+                                                + INODE_SIZE + sizeof(struct wfs_log_entry);
+
+    if(space_required_for_new_log+super_block->head >= file_size) {
+        return -ENOSPC;
+    }
+
+    //create new log entry for parent inode
     struct wfs_log_entry *new_parent_log = (struct wfs_log_entry *)((char *)disk_ptr + super_block->head);
 
     memcpy((void *)new_parent_log, (void *)parent, log_entry_size);
@@ -332,6 +306,14 @@ static int my_write(const char* path, const char *buf, size_t size, off_t offset
 
     //allocate new log entry
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+    size_t space_required_for_new_log = sizeof(struct wfs_dentry) + offset+size
+                                                + INODE_SIZE + sizeof(struct wfs_log_entry);
+
+    if(space_required_for_new_log+super_block->head >= file_size) {
+        return -ENOSPC;
+    }
+
+    //create new log entry for parent inode
     char *free_block = (char *)disk_ptr + super_block->head;
     struct wfs_log_entry *new_log_entry = (struct wfs_log_entry *)free_block;
 
@@ -361,8 +343,6 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
 
     char *file_name = get_filename_and_parent_path(path_name);
 
-    printf("file name mknod %s\n", file_name);
-    printf("parent path mknod %s\n", path_name);
     //extract parent inode 
     int parent_inode_number = find_inode(path_name);
     if(parent_inode_number == -1) 
@@ -385,8 +365,17 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
     if(check_file_exists(dentry, dentry_count, file_name) == 1) 
         return -EEXIST;
     
-    //create new log entry for parent inode
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+
+    //check if space is available for log insertion 
+    size_t space_required_for_new_log = sizeof(struct wfs_dentry) + parent->inode.size 
+                                                + INODE_SIZE + sizeof(struct wfs_log_entry);
+
+    if(space_required_for_new_log+super_block->head >= file_size) {
+        return -ENOSPC;
+    }
+
+    //create new log entry for parent inode
     struct wfs_log_entry *new_parent_log = (struct wfs_log_entry *)((char *)disk_ptr + super_block->head);
 
     memcpy((void *)new_parent_log, (void *)parent, log_entry_size);
@@ -461,6 +450,14 @@ static int my_unlink(const char *path) {
         return -ENOENT;
 
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+
+    size_t space_required_for_new_log = sizeof(struct wfs_dentry) + parent_log->inode.size 
+                                                + INODE_SIZE + sizeof(struct wfs_log_entry);
+
+    if(space_required_for_new_log+super_block->head >= file_size) {
+        return -ENOSPC;
+    }
+
     struct wfs_log_entry *new_parent_log = (struct wfs_log_entry *)((char *) disk_ptr + super_block->head);
     
     memcpy((char *)new_parent_log, (char *)parent_log, parent_log->inode.size+INODE_SIZE);
@@ -527,7 +524,7 @@ int main(int argc, char *argv[])
     }
 
     // Get the file size
-    size_t file_size = lseek(fd, 0, SEEK_END);
+    file_size = lseek(fd, 0, SEEK_END);
 
     disk_ptr = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
