@@ -21,7 +21,7 @@ static int my_getattr(const char *path, struct stat *stbuf)
     // Implementation of getattr function to retrieve file attributes
     // Fill stbuf structure with the attributes of the file/directory indicated by path
     // ...
-    printf("my get attribute %s\n", path);
+printf("my get attribute %s\n", path);
     int inode_number = find_inode(path);
     if (inode_number == -1)
         return -ENOENT;
@@ -230,6 +230,7 @@ char *get_filename_and_parent_path(char *path_name) {
     {
         file_name = file_name + 1;
         path_name[file_name - path_name-1] = '\0';
+
     } else {
         file_name = malloc(j+1);
         strncpy(file_name, path_name, j);
@@ -279,7 +280,7 @@ static int my_mkdir(const char *path, mode_t mode)
 
     //check if the directory already exists 
     if(check_file_exists(dentry, dentry_count, dir_name) == 1) 
-        return EEXIST;
+        return -EEXIST;
     
     //create new log entry for parent inode
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
@@ -360,6 +361,8 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
 
     char *file_name = get_filename_and_parent_path(path_name);
 
+    printf("file name mknod %s\n", file_name);
+    printf("parent path mknod %s\n", path_name);
     //extract parent inode 
     int parent_inode_number = find_inode(path_name);
     if(parent_inode_number == -1) 
@@ -380,7 +383,7 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
 
     //check if the directory already exists 
     if(check_file_exists(dentry, dentry_count, file_name) == 1) 
-        return EEXIST;
+        return -EEXIST;
     
     //create new log entry for parent inode
     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
@@ -417,6 +420,69 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
     return 0;
 }
 
+void printf_dir_contents(char *data, int size) {
+    struct wfs_dentry *first_dentry = (struct wfs_dentry *) data;
+    for(int i=0;i<size;i++) {
+        printf("file name of index %d is %s\n", i, first_dentry->name);
+        first_dentry = first_dentry+1;
+    }
+}
+
+static int my_unlink(const char *path) {
+
+    printf("unlink path %s\n", path);
+    char *path_name = malloc(strlen(path) +1);
+    strcpy(path_name, path);
+    // path_name[strlen(path)] = '\0';
+
+    char *file_name = get_filename_and_parent_path(path_name);
+    int parent_inode_number = find_inode(path_name);
+
+    if(parent_inode_number == -1) 
+        return -ENOENT;
+
+    struct wfs_log_entry *parent_log = (struct wfs_log_entry *)inode_maps[parent_inode_number];
+    int dir_entry_count = parent_log->inode.size/sizeof(struct wfs_dentry);
+
+    int file_inode_number = -1;
+    int i;
+    for(i=0;i<dir_entry_count;i++) {
+        struct wfs_dentry *dentry = (struct wfs_dentry *) parent_log->data;
+
+        if(strcmp(dentry->name, file_name) == 0) {
+            file_inode_number = dentry->inode_number;
+            break;
+        }
+
+        dentry = dentry +1;
+    }
+
+    if(file_inode_number == -1) 
+        return -ENOENT;
+
+    struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+    struct wfs_log_entry *new_parent_log = (struct wfs_log_entry *)((char *) disk_ptr + super_block->head);
+    
+    memcpy((char *)new_parent_log, (char *)parent_log, parent_log->inode.size+INODE_SIZE);
+
+    //delete the directory entry in parent log
+    struct wfs_dentry *first_dentry = (struct wfs_dentry *) new_parent_log->data;
+    struct wfs_dentry *curr_dentry;
+    for(int j = i;j<dir_entry_count;j++) {
+        curr_dentry = first_dentry +j;
+        *curr_dentry = *(curr_dentry+1);
+    }
+
+    new_parent_log->inode.size = new_parent_log->inode.size - sizeof(struct wfs_dentry);
+    inode_maps[parent_inode_number] = (char *)new_parent_log;
+    inode_maps[file_inode_number] = NULL;
+
+    // printf_dir_contents(new_parent_log->data, new_parent_log->inode.size/sizeof(struct wfs_dentry));
+    return 0;
+}
+
+
+
 static struct fuse_operations my_operations = {
     .getattr = my_getattr,
     .readdir = my_readdir,
@@ -425,6 +491,7 @@ static struct fuse_operations my_operations = {
     .mkdir = my_mkdir,
     .write = my_write,
     .mknod = my_mknod,
+    .unlink = my_unlink,
     // Add other functions (read, write, mkdir, etc.) here as needed
 };
 
