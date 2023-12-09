@@ -1,3 +1,5 @@
+#define _FILE_OFFSET_BITS 64
+
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -6,6 +8,7 @@
 #include <string.h>
 #include "wfs.h"
 #include "fuse.h"
+
 
 int main(int argc, char *argv[])
 {
@@ -46,7 +49,6 @@ int main(int argc, char *argv[])
     root_dir->inode.mode = S_IFDIR;
     super_block->head += (uint32_t)(sizeof(struct wfs_log_entry));
 
-    printf("%x\n",super_block->head);
 
     // Sync changes to the underlying file
     msync(data, file_size, MS_SYNC);
@@ -56,8 +58,6 @@ int main(int argc, char *argv[])
 
     // Close the file
     close(fd);
-
-    printf("Super block and root directory created!\n");
 
     return 0;
 }

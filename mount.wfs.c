@@ -6,11 +6,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "wfs.h"
 
 int find_inode(const char *path);
+void compress_logs();
 
 char *inode_maps[MAX_INODES];
 
@@ -23,7 +23,7 @@ static int my_getattr(const char *path, struct stat *stbuf)
     // Implementation of getattr function to retrieve file attributes
     // Fill stbuf structure with the attributes of the file/directory indicated by path
     // ...
-printf("my get attribute %s\n", path);
+
     int inode_number = find_inode(path);
     if (inode_number == -1)
         return -ENOENT;
@@ -120,10 +120,9 @@ int find_inode(const char *path)
 
 static int my_open(const char *path, struct fuse_file_info *fi)
 {
-    printf("my open operation %s\n", path);
 
     int inode = find_inode(path);
-    printf("inode number %d\n", inode);
+
     if (inode < 0)
         return -1;
     return 0;
@@ -131,10 +130,8 @@ static int my_open(const char *path, struct fuse_file_info *fi)
 
 static int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    printf("my read operation %s\n", path);
 
     int inode = find_inode(path);
-    printf("inode number %d\n", inode);
     if (inode < 0)
         return 0;
 
@@ -145,10 +142,8 @@ static int my_read(const char *path, char *buf, size_t size, off_t offset, struc
 
 int my_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-    printf("my read dir operation %s\n", path);
 
     int inode = find_inode(path);
-    printf("inode number %d\n", inode);
 
     filler(buffer, ".", NULL, 0);
     filler(buffer, "..", NULL, 0);
@@ -160,7 +155,6 @@ int my_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t off
     for (int j = 0; j < n_dir; j++)
     {
         struct wfs_dentry *dentry = (struct wfs_dentry *)(inode_maps[inode] + INODE_SIZE + j * sizeof(struct wfs_dentry));
-        printf(":%s:\n", dentry->name);
         filler(buffer, dentry->name, NULL, 0);
     }
     return 0;
@@ -220,7 +214,6 @@ int check_file_exists(struct wfs_dentry *dir_entries, int dentry_count, char *fi
 
 static int my_mkdir(const char *path, mode_t mode)
 {
-    printf("making directory %s and mode %d \n", path , (int) mode);
     int j = strlen(path);
     char *path_name = malloc(j + 1);
     strcpy(path_name, path);
@@ -254,6 +247,7 @@ static int my_mkdir(const char *path, mode_t mode)
                                                 + INODE_SIZE + sizeof(struct wfs_log_entry);
 
     if(space_required_for_new_log+super_block->head >= file_size) {
+        compress_logs();
         return -ENOSPC;
     }
 
@@ -295,7 +289,6 @@ static int my_mkdir(const char *path, mode_t mode)
 
 static int my_write(const char* path, const char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
     
-    printf("writing to a file %s\n", path);
     int inode_number = find_inode(path);
     if(inode_number == -1) {
         return -ENOENT;
@@ -310,6 +303,7 @@ static int my_write(const char* path, const char *buf, size_t size, off_t offset
                                                 + INODE_SIZE + sizeof(struct wfs_log_entry);
 
     if(space_required_for_new_log+super_block->head >= file_size) {
+        compress_logs();
         return -ENOSPC;
     }
 
@@ -336,7 +330,7 @@ static int my_write(const char* path, const char *buf, size_t size, off_t offset
 }
 
 static int my_mknod(const char *path, mode_t mode, dev_t dev) {
-    printf("making node %s with mode %d \n", path , (int) mode);
+
     int j = strlen(path);
     char *path_name = malloc(j + 1);
     strcpy(path_name, path);
@@ -372,6 +366,7 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
                                                 + INODE_SIZE + sizeof(struct wfs_log_entry);
 
     if(space_required_for_new_log+super_block->head >= file_size) {
+        compress_logs();
         return -ENOSPC;
     }
 
@@ -412,14 +407,12 @@ static int my_mknod(const char *path, mode_t mode, dev_t dev) {
 void printf_dir_contents(char *data, int size) {
     struct wfs_dentry *first_dentry = (struct wfs_dentry *) data;
     for(int i=0;i<size;i++) {
-        printf("file name of index %d is %s\n", i, first_dentry->name);
         first_dentry = first_dentry+1;
     }
 }
 
 static int my_unlink(const char *path) {
 
-    printf("unlink path %s\n", path);
     char *path_name = malloc(strlen(path) +1);
     strcpy(path_name, path);
     // path_name[strlen(path)] = '\0';
@@ -455,6 +448,7 @@ static int my_unlink(const char *path) {
                                                 + INODE_SIZE + sizeof(struct wfs_log_entry);
 
     if(space_required_for_new_log+super_block->head >= file_size) {
+        compress_logs();
         return -ENOSPC;
     }
 
@@ -474,7 +468,6 @@ static int my_unlink(const char *path) {
     inode_maps[parent_inode_number] = (char *)new_parent_log;
     inode_maps[file_inode_number] = NULL;
 
-    // printf_dir_contents(new_parent_log->data, new_parent_log->inode.size/sizeof(struct wfs_dentry));
     return 0;
 }
 
@@ -503,7 +496,6 @@ int main(int argc, char *argv[])
 
     if (argc <= 3)
     {
-        printf("disk path and mount are required\n");
         exit(1);
     }
 
@@ -534,4 +526,32 @@ int main(int argc, char *argv[])
     argc--;
 
     return fuse_main(argc, argv, &my_operations, NULL);
+}
+
+void compress_logs() {
+     struct wfs_sb *super_block = (struct wfs_sb *)disk_ptr;
+
+     char *curr_node = (char *)disk_ptr + sizeof(struct wfs_sb);
+     char *end_node = (char *)disk_ptr + super_block->head;
+     char *tail = curr_node;
+
+     while(curr_node<end_node) {
+        struct wfs_log_entry *log_entry = (struct wfs_log_entry *)curr_node;
+        int log_size = log_entry->inode.size+INODE_SIZE;
+        if(inode_maps[log_entry->inode.inode_number] == (char *)log_entry) {
+            if(tail != curr_node) {
+                strncpy(tail, curr_node, log_size);
+                inode_maps[log_entry->inode.inode_number] = tail;
+                tail = tail + log_size;
+            }
+        }
+
+        curr_node = curr_node + log_size;
+
+        memset(tail, 0, file_size-(tail-(char *)disk_ptr));
+     }
+
+     super_block->head = (uint32_t) (tail-(char *)disk_ptr);
+
+    msync(disk_ptr, file_size, MS_SYNC);
 }

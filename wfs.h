@@ -39,5 +39,5 @@ struct wfs_log_entry {
     struct wfs_inode inode;
     char data[];
 };
-
+ 
 #endif
